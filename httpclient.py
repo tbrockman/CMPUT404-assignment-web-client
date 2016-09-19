@@ -36,8 +36,13 @@ class HTTPClient(object):
     #def get_host_port(self,url):
 
     def connect(self, host, port):
-        # use sockets!
-        return None
+        outgoing = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        outgoing.connect((host, port))
+        outgoing.setblocking(0)
+        return outgoing
+
+    def get_socket(self):
+        return self.socket
 
     def get_code(self, data):
         return None
