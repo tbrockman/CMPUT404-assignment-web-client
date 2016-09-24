@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # coding: utf-8
 # Copyright 2016 Abram Hindle, https://github.com/tywtyw2002, and https://github.com/treedust
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -23,6 +23,7 @@ import socket
 import re
 # you may use urllib to encode data appropriately
 import urllib
+import urlparse
 
 def help():
     print "httpclient.py [GET/POST] [URL]\n"
@@ -40,6 +41,9 @@ class HTTPClient(object):
         outgoing.connect((host, port))
         outgoing.setblocking(0)
         return outgoing
+
+    def get_host(self):
+        return self.host
 
     def get_socket(self):
         return self.socket
@@ -65,9 +69,31 @@ class HTTPClient(object):
                 done = not part
         return str(buffer)
 
+    def sendDataWithHeaders(self, out_socket, headers, data):
+        for header in headers:
+            out_socket.sendall(header)
+
+        if data:
+            for line in data:
+                out_socket.send(line)
+
+        out_socket.sendall('\r\n')
+
+    def sendRequest(self, method, url):
+        parsed_url = urlparse.urlparse(url)
+        request_line = method + ' ' + parsed_url.path + ' HTTP/1.1 \r\n'
+        host = parsed_url.netloc + '\r\n'
+        port = parsed_url.port
+        if not port:
+            port = 80
+
+        outgoing = self.connect(host, port)
+        self.sendDataWithHeaders(outgoing, [request_line, host])
+
     def GET(self, url, args=None):
         code = 500
         body = ""
+        self.sendRequest('GET', url)
         return HTTPResponse(code, body)
 
     def POST(self, url, args=None):
@@ -80,7 +106,7 @@ class HTTPClient(object):
             return self.POST( url, args )
         else:
             return self.GET( url, args )
-    
+
 if __name__ == "__main__":
     client = HTTPClient()
     command = "GET"
@@ -90,4 +116,4 @@ if __name__ == "__main__":
     elif (len(sys.argv) == 3):
         print client.command( sys.argv[2], sys.argv[1] )
     else:
-        print client.command( sys.argv[1] )   
+        print client.command( sys.argv[1] )
