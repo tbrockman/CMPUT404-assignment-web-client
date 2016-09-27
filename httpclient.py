@@ -24,6 +24,7 @@ import re
 # you may use urllib to encode data appropriately
 import urllib
 import urlparse
+import os
 
 def help():
     print "httpclient.py [GET/POST] [URL]\n"
@@ -34,12 +35,9 @@ class HTTPResponse(object):
         self.body = body
 
 class HTTPClient(object):
-    #def get_host_port(self,url):
-
     def connect(self, host, port):
         outgoing = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         outgoing.connect((host, port))
-        outgoing.setblocking(0)
         return outgoing
 
     def get_host(self):
@@ -69,36 +67,55 @@ class HTTPClient(object):
                 done = not part
         return str(buffer)
 
-    def sendDataWithHeaders(self, out_socket, headers, data):
-        for header in headers:
-            out_socket.sendall(header)
+    def sendDataWithHeaders(self, data, headers, out_socket):
+        header = "".join(headers)
+        out_socket.sendall(header)
 
         if data:
-            for line in data:
-                out_socket.send(line)
+            out_socket.sendall(data)
 
-        out_socket.sendall('\r\n')
-
-    def sendRequest(self, method, url):
+    def sendRequest(self, method, url, args=None):
         parsed_url = urlparse.urlparse(url)
-        request_line = method + ' ' + parsed_url.path + ' HTTP/1.1 \r\n'
-        host = parsed_url.netloc + '\r\n'
+        data = None
+        if len(parsed_url.path) == 0:
+            path = "/"
+        else:
+            path = parsed_url.path
+
+        request_line = method + ' ' + path + ' HTTP/1.1\r\n'
+        host = "Host: " + parsed_url.hostname + '\r\n'
+        headers = [request_line, host]
+
+        if (method == 'GET'):
+            accept = "Accept: */*\r\n"
+            headers.append(accept)
+        
+        elif (method == 'POST'):
+            if (args):
+                content_type = "Content-Type: application/x-www-form-urlencoded\r\n"
+                data = urllib.urlencode(args)
+                content_length = "Content-Length: " + str(len(data)) + "\r\n"
+                headers += [content_type, content_length]
+
+        end = "\r\n"
+        headers.append(end)
         port = parsed_url.port
         if not port:
             port = 80
 
-        outgoing = self.connect(host, port)
-        self.sendDataWithHeaders(outgoing, [request_line, host])
+        outgoing = self.connect(parsed_url.hostname, port)
+        self.sendDataWithHeaders(data, headers, outgoing)
+        return_data = self.recvall(outgoing);
+        print return_data
+        code = int(return_data.split(' ')[1])
+        return code, return_data
 
     def GET(self, url, args=None):
-        code = 500
-        body = ""
-        self.sendRequest('GET', url)
+        code, body = self.sendRequest('GET', url, args)
         return HTTPResponse(code, body)
 
     def POST(self, url, args=None):
-        code = 500
-        body = ""
+        code, body = self.sendRequest('POST', url, args)
         return HTTPResponse(code, body)
 
     def command(self, url, command="GET", args=None):
