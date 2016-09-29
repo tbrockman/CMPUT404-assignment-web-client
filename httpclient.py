@@ -25,6 +25,7 @@ import re
 import urllib
 import urlparse
 import os
+import json
 
 def help():
     print "httpclient.py [GET/POST] [URL]\n"
@@ -84,18 +85,20 @@ class HTTPClient(object):
 
         request_line = method + ' ' + path + ' HTTP/1.1\r\n'
         host = "Host: " + parsed_url.hostname + '\r\n'
-        headers = [request_line, host]
+        accept_charset = "Accept-Charset: utf-8\r\n"
+        headers = [request_line, host, accept_charset]
 
         if (method == 'GET'):
             accept = "Accept: */*\r\n"
             headers.append(accept)
-        
+
         elif (method == 'POST'):
             if (args):
                 content_type = "Content-Type: application/x-www-form-urlencoded\r\n"
                 data = urllib.urlencode(args)
+                accept = "Accept: application/json\r\n"
                 content_length = "Content-Length: " + str(len(data)) + "\r\n"
-                headers += [content_type, content_length]
+                headers += [accept, content_type, content_length]
 
         end = "\r\n"
         headers.append(end)
@@ -106,9 +109,9 @@ class HTTPClient(object):
         outgoing = self.connect(parsed_url.hostname, port)
         self.sendDataWithHeaders(data, headers, outgoing)
         return_data = self.recvall(outgoing);
-        print return_data
+        body = return_data.split('\r\n\r\n')[1]
         code = int(return_data.split(' ')[1])
-        return code, return_data
+        return code, body
 
     def GET(self, url, args=None):
         code, body = self.sendRequest('GET', url, args)
