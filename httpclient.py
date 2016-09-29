@@ -69,29 +69,36 @@ class HTTPClient(object):
         return str(buffer)
 
     def sendDataWithHeaders(self, data, headers, out_socket):
+        # Combine and send headers
         header = "".join(headers)
         out_socket.sendall(header)
 
+        # If there is data, send after
         if data:
             out_socket.sendall(data)
 
     def sendRequest(self, method, url, args=None):
+        # Parse the url into its components
         parsed_url = urlparse.urlparse(url)
         data = None
+        # Handle no trailing slash
         if len(parsed_url.path) == 0:
             path = "/"
         else:
             path = parsed_url.path
 
+        # These headers are static
         request_line = method + ' ' + path + ' HTTP/1.1\r\n'
         host = "Host: " + parsed_url.hostname + '\r\n'
         accept_charset = "Accept-Charset: utf-8\r\n"
         headers = [request_line, host, accept_charset]
 
+        # Add content that we're willing to accept if GET
         if (method == 'GET'):
             accept = "Accept: */*\r\n"
             headers.append(accept)
 
+        # If post encode the arguments, calculate content length, prefer application/json replies
         elif (method == 'POST'):
             if (args):
                 content_type = "Content-Type: application/x-www-form-urlencoded\r\n"
@@ -100,17 +107,25 @@ class HTTPClient(object):
                 content_length = "Content-Length: " + str(len(data)) + "\r\n"
                 headers += [accept, content_type, content_length]
 
+        # End headers
         end = "\r\n"
         headers.append(end)
         port = parsed_url.port
+
+        # Assume port 80 if no port found
         if not port:
             port = 80
 
+        # Connect
         outgoing = self.connect(parsed_url.hostname, port)
+        # Send the encoded data with specified headers to the connected socket
         self.sendDataWithHeaders(data, headers, outgoing)
+        # Retrieve any response
         return_data = self.recvall(outgoing);
+        # Parse the response into headers and data
         body = return_data.split('\r\n\r\n')[1]
         code = int(return_data.split(' ')[1])
+        # Return code and response body
         return code, body
 
     def GET(self, url, args=None):
